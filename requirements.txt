@@ -10,10 +10,7 @@ python-multipart==0.0.20
 jinja2==3.1.6
 
 # ── LangChain + LangGraph ────────────────────────────────
-langchain==0.3.20
 langchain-core==0.3.44
-langchain-community==0.3.19
-langchain-text-splitters==0.3.6
 langchain-google-genai>=2.0.0
 langgraph==0.3.9
 langgraph-checkpoint==2.0.19
@@ -21,22 +18,14 @@ langgraph-checkpoint==2.0.19
 # ── Google Gemini ─────────────────────────────────────────
 google-generativeai>=0.8.0
 
-# ── Vector Store (Qdrant local — no server needed) ────────
+# ── Vector Store Client ──────────────────────────────────
 langchain-qdrant==0.2.0
 qdrant-client==1.13.3
-fastembed==0.6.1
 
-# ── Reranker (local HuggingFace — free, no API) ──────────
-sentence-transformers==3.4.1
-
-# ── Document Parsing ──────────────────────────────────────
+# ── Document Parsing & Language Detection ─────────────────
 pypdf==5.4.0
-docling==2.31.0
-docling-core==2.28.1
-
-# ── Language Detection (multilingual) ────────────────────
 langdetect==1.0.9
 
 # ── Utilities ─────────────────────────────────────────────
 requests==2.32.3
-numpy== 1.26.4
+numpy==1.26.4
