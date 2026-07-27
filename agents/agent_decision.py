@@ -5,26 +5,35 @@ Powered by Gemini (free tier)
 """
 
 import json
+import os
+import re
+import ast
 from typing import Dict, List, Optional, Any, Union, Annotated, TypedDict
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langgraph.graph import MessagesState, StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-import os
 from dotenv import load_dotenv
 
-from agents.rag_agent import MedicalRAG
 from agents.guardrails.local_guardrails import LocalGuardrails
 from config import Config
+
+# Lazily import MedicalRAG to avoid import errors on serverless deployment
+try:
+    from agents.rag_agent import MedicalRAG
+except Exception:
+    MedicalRAG = None
 
 load_dotenv()
 
 config = Config()
 memory = MemorySaver()
 
+
 def get_thread_config(mother_id: str = "default") -> dict:
     return {"configurable": {"thread_id": mother_id}}
+
 
 # Keep backward compat
 thread_config = get_thread_config("maternal_main")
@@ -80,10 +89,43 @@ IMPORTANT RULES:
 MaternaAI Response:"""
 
 
+def _clean_text_content(content: Any) -> str:
+    """Utility to clean stringified dictionary output or list structures from LLM messages."""
+    if not content:
+        return ""
+
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and "text" in block:
+                text_parts.append(block["text"])
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return "".join(text_parts)
+
+    text_str = str(content)
+
+    if text_str.startswith("[{") or "'text':" in text_str or '"text":' in text_str:
+        try:
+            parsed = ast.literal_eval(text_str)
+            if isinstance(parsed, list):
+                return "".join(
+                    item.get("text", "") for item in parsed if isinstance(item, dict)
+                )
+        except Exception:
+            pass
+
+        match = re.search(r"['\"]text['\"]\s*:\s*['\"](.*?)['\"](?:\s*\}|\s*,)", text_str, re.DOTALL)
+        if match:
+            return match.group(1).replace("\\n", "\n").replace("\\'", "'")
+
+    return text_str
+
+
 class AgentState(MessagesState):
     agent_name: Optional[str]
     current_input: Optional[Union[str, Dict]]
-    output: Optional[str]
+    output: Optional[Union[str, AIMessage]]
     needs_human_validation: bool
     retrieval_confidence: float
     bypass_routing: bool
@@ -135,10 +177,11 @@ def create_agent_graph():
 
         recent_context = ""
         for msg in messages[-6:]:
+            content_str = _clean_text_content(msg.content)
             if isinstance(msg, HumanMessage):
-                recent_context += f"User: {msg.content}\n"
+                recent_context += f"User: {content_str}\n"
             elif isinstance(msg, AIMessage):
-                recent_context += f"Assistant: {msg.content}\n"
+                recent_context += f"Assistant: {content_str}\n"
 
         decision_input = f"""User query: {input_text}
 
@@ -167,10 +210,11 @@ Which agent should handle this?"""
 
         recent_context = ""
         for msg in messages:
+            content_str = _clean_text_content(msg.content)
             if isinstance(msg, HumanMessage):
-                recent_context += f"User: {msg.content}\n"
+                recent_context += f"User: {content_str}\n"
             elif isinstance(msg, AIMessage):
-                recent_context += f"Assistant: {msg.content}\n"
+                recent_context += f"Assistant: {content_str}\n"
 
         prompt = MATERNAL_CONVERSATION_PROMPT.format(
             sensor_context=sensor_context or "No live sensor data available.",
@@ -180,7 +224,8 @@ Which agent should handle this?"""
 
         try:
             response = config.conversation.llm.invoke(prompt)
-            response_text = response.content if hasattr(response, 'content') else str(response)
+            raw_content = response.content if hasattr(response, 'content') else str(response)
+            response_text = _clean_text_content(raw_content)
         except Exception as e:
             response_text = f"I'm sorry, I encountered an error. Please try again. ({str(e)})"
 
@@ -192,17 +237,27 @@ Which agent should handle this?"""
 
     def run_rag_agent(state: AgentState) -> AgentState:
         print("[RAG_AGENT] Processing...")
-        rag_agent = MedicalRAG(config)
+        if MedicalRAG is None:
+            print("[RAG_AGENT] MedicalRAG not available. Falling back to CONVERSATION_AGENT.")
+            return run_conversation_agent(state)
+
+        try:
+            rag_agent = MedicalRAG(config)
+        except Exception as e:
+            print(f"[RAG_AGENT] Initialization error: {e}. Falling back to CONVERSATION_AGENT.")
+            return run_conversation_agent(state)
+
         messages = state["messages"]
         query = state["current_input"]
         sensor_context = state.get("sensor_context", "")
 
         recent_context = ""
         for msg in messages[-config.rag.context_limit:]:
+            content_str = _clean_text_content(msg.content)
             if isinstance(msg, HumanMessage):
-                recent_context += f"User: {msg.content}\n"
+                recent_context += f"User: {content_str}\n"
             elif isinstance(msg, AIMessage):
-                recent_context += f"Assistant: {msg.content}\n"
+                recent_context += f"Assistant: {content_str}\n"
 
         # Inject sensor context into query for better retrieval
         augmented_query = query
@@ -213,7 +268,8 @@ Which agent should handle this?"""
             response = rag_agent.process_query(augmented_query, chat_history=recent_context)
             retrieval_confidence = response.get("confidence", 0.0)
             response_content = response["response"]
-            response_text = response_content.content if hasattr(response_content, 'content') else str(response_content)
+            raw_text = response_content.content if hasattr(response_content, 'content') else str(response_content)
+            response_text = _clean_text_content(raw_text)
         except Exception as e:
             print(f"[RAG_AGENT] Error: {e}")
             return {
@@ -258,13 +314,15 @@ Which agent should handle this?"""
         return {"agent_state": state, "next": END}
 
     def apply_output_guardrails(state: AgentState) -> AgentState:
-        output = state["output"]
-        current_input = state["current_input"]
+        output = state.get("output")
+        current_input = state.get("current_input")
 
         if not output or not isinstance(output, (str, AIMessage)):
             return state
 
         output_text = output if isinstance(output, str) else output.content
+        output_text = _clean_text_content(output_text)
+        
         if not output_text:
             return state
 
@@ -275,8 +333,8 @@ Which agent should handle this?"""
         except Exception:
             sanitized_output = output_text
 
-        sanitized_message = AIMessage(content=sanitized_output)
-        return {**state, "messages": sanitized_message, "output": sanitized_message}
+        sanitized_message = AIMessage(content=_clean_text_content(sanitized_output))
+        return {**state, "messages": [sanitized_message], "output": sanitized_message}
 
     # Build the graph
     workflow = StateGraph(AgentState)
