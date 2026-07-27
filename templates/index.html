@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MaternaAI — Maternal Health Assistant</title>
+  <meta name="description" content="AI-powered maternal health companion for pregnant mothers" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root {
+      --bg:          #F6F4FE;
+      --surface:     #FFFFFF;
+      --surface-2:   #F0EDFB;
+      --purple:      #7C3AED;
+      --purple-light:#8B5CF6;
+      --purple-pale: #EDE9FE;
+      --purple-mid:  #DDD6FE;
+      --text:        #1A1228;
+      --text-2:      #5B5573;
+      --text-3:      #9D97B0;
+      --border:      #E9E5F5;
+      --green:       #10B981;
+      --amber:       #F59E0B;
+      --red:         #EF4444;
+      --radius:      20px;
+      --radius-sm:   12px;
+      --shadow:      0 2px 16px rgba(124,58,237,0.08);
+      --shadow-md:   0 8px 32px rgba(124,58,237,0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      font-family: 'Inter', system-ui, sans-serif;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ─── LAYOUT ─── */
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Brand */
+    .brand {
+      padding: 24px 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .brand-icon {
+      width: 48px; height: 48px;
+      background: var(--purple);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-3);
+      font-weight: 400;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: #DCFCE7;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #15803D;
+      margin-top: 12px;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      background: #22C55E;
+      border-radius: 50%;
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Sidebar scrollable body */
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .sidebar-body::-webkit-scrollbar { width: 0; }
+
+    /* Section label */
+    .sec-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 10px;
+    }
+
+    /* ── Vitals ── */
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .vital-card {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .vital-card:hover { box-shadow: var(--shadow); border-color: var(--purple-mid); }
+    .v-label { font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+    .v-val   { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; }
+    .v-unit  { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 500; }
+    .vital-card.ok   .v-val { color: var(--green); }
+    .vital-card.warn .v-val { color: var(--amber); }
+    .vital-card.bad  .v-val { color: var(--red);   }
+    .vital-card.def  .v-val { color: var(--purple); }
+
+    /* ── Alerts ── */
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      border-left: 4px solid var(--amber);
+      padding: 12px 14px;
+      animation: fadeInLeft 0.3s ease;
+    }
+    .alert-item.crit { border-left-color: var(--red); }
+    .alert-item.info { border-left-color: var(--green); }
+    .alert-name   { font-size: 12px; font-weight: 700; color: var(--text); }
+    .alert-reason { font-size: 11px; color: var(--text-2); margin-top: 4px; line-height: 1.5; }
+    .no-alerts {
+      text-align: center;
+      padding: 20px 16px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
+      color: var(--text-3);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .no-alerts i { font-size: 22px; color: var(--green); display: block; margin-bottom: 8px; }
+
+    /* ── Session ── */
+    .session-fields { display: flex; flex-direction: column; gap: 10px; }
+    .field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+    }
+    .field-row label { font-size: 11px; font-weight: 600; color: var(--text-3); }
+    .field-row input, .field-row select {
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--purple);
+      text-align: right;
+      width: 130px;
+    }
+    .field-row select option { background: white; color: var(--text); }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-clear {
+      width: 100%;
+      padding: 12px;
+      background: var(--purple-pale);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--purple);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.2s;
+    }
+    .btn-clear:hover { background: var(--purple-mid); }
+
+    /* ─── CHAT PANEL ─── */
+    .chat-panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .chat-header {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .chat-hdr-left { display: flex; align-items: center; gap: 14px; }
+    .chat-hdr-avatar {
+      width: 44px; height: 44px;
+      background: var(--purple-pale);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .chat-hdr-title { font-size: 16px; font-weight: 800; color: var(--text); }
+    .chat-hdr-sub   { font-size: 12px; color: var(--text-3); margin-top: 1px; font-weight: 400; }
+    .agent-tag {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 14px;
+      background: var(--purple-pale);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple);
+      letter-spacing: 0.3px;
+    }
+
+    /* Messages */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--purple-mid); border-radius: 4px; }
+
+    /* Welcome */
+    .welcome {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 20px;
+      padding: 40px;
+    }
+    .welcome-icon {
+      width: 96px; height: 96px;
+      background: linear-gradient(145deg, #EDE9FE, #DDD6FE);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px;
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+    .welcome h2 { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+    .welcome p  { font-size: 15px; color: var(--text-2); line-height: 1.7; max-width: 440px; }
+    .quick-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
+    .quick-btn {
+      padding: 10px 18px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 25px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .quick-btn:hover {
+      background: var(--purple-pale);
+      border-color: var(--purple-mid);
+      color: var(--purple);
+    }
+
+    /* Message bubbles */
+    .msg { display: flex; align-items: flex-end; gap: 10px; max-width: 82%; animation: fadeUp 0.25s ease; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg.ai   { align-self: flex-start; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInLeft {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .msg-av {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .msg.user .msg-av { background: var(--purple); }
+    .msg.ai   .msg-av { background: var(--purple-pale); }
+
+    .msg-body { display: flex; flex-direction: column; gap: 4px; }
+    .msg.user .msg-body { align-items: flex-end; }
+
+    .bubble {
+      padding: 14px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .msg.user .bubble {
+      background: var(--purple);
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+    .msg.ai .bubble {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 5px;
+    }
+
+    /* Markdown in AI bubble */
+    .bubble p { margin-bottom: 8px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble strong { font-weight: 700; color: var(--purple); }
+    .bubble em { color: var(--text-2); }
+    .bubble ul, .bubble ol { padding-left: 20px; margin: 8px 0; }
+    .bubble li { margin-bottom: 5px; }
+    .bubble h3, .bubble h4 { font-size: 14px; font-weight: 700; color: var(--text); margin: 12px 0 6px; }
+    .bubble table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 10px 0; }
+    .bubble th { background: var(--purple-pale); padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; }
+    .bubble td { padding: 8px 12px; border-top: 1px solid var(--border); }
+    .bubble code { background: var(--purple-pale); padding: 2px 7px; border-radius: 5px; font-size: 12px; color: var(--purple); }
+    .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+    .msg-meta { font-size: 10px; color: var(--text-3); padding: 0 4px; font-weight: 500; }
+
+    /* Typing */
+    .typing { display: flex; align-items: center; gap: 10px; align-self: flex-start; animation: fadeUp 0.25s ease; }
+    .typing .msg-av { background: var(--purple-pale); }
+    .typing-dots {
+      display: flex; gap: 5px; align-items: center;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      padding: 14px 18px;
+      border-radius: 20px;
+      border-bottom-left-radius: 5px;
+    }
+    .typing-dots span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--purple-mid);
+      animation: bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); background: var(--purple-mid); }
+      40% { transform: translateY(-6px); background: var(--purple); }
+    }
+
+    /* ─── INPUT ─── */
+    .input-area {
+      padding: 20px 28px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 18px;
+      padding: 12px 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-wrap:focus-within {
+      border-color: var(--purple-light);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+    }
+    #msgInput {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      resize: none;
+      max-height: 120px;
+      min-height: 24px;
+      line-height: 1.5;
+    }
+    #msgInput::placeholder { color: var(--text-3); }
+    .input-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .char-count { font-size: 11px; color: var(--text-3); font-weight: 500; }
+    .send-btn {
+      width: 42px; height: 42px;
+      background: var(--purple);
+      border: none;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: white;
+      font-size: 16px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover:not(:disabled) { background: #6D28D9; box-shadow: 0 4px 16px rgba(124,58,237,0.3); transform: translateY(-1px); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .input-hint { font-size: 11px; color: var(--text-3); margin-top: 8px; text-align: center; font-weight: 400; }
+
+    /* ─── CRITICAL OVERLAY ─── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(26,18,40,0.5);
+      backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .overlay.show { display: flex; }
+    .overlay-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 40px;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+      animation: fadeUp 0.3s ease;
+    }
+    .overlay-icon { font-size: 56px; margin-bottom: 16px; }
+    .overlay-title { font-size: 20px; font-weight: 800; color: var(--red); margin-bottom: 10px; }
+    .overlay-body  { font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 24px; }
+    .overlay-btn {
+      padding: 12px 28px;
+      background: var(--red); border: none; border-radius: 12px;
+      color: white; font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .overlay-btn:hover { background: #DC2626; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside class="sidebar">
+    <!-- Brand -->
+    <div class="brand">
+      <div class="brand-top">
+        <div class="brand-icon">🤱</div>
+        <div>
+          <div class="brand-name">MaternaAI</div>
+          <div class="brand-sub">Maternal Health Assistant</div>
+        </div>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot"></span> System Ready
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="sidebar-body">
+
+      <!-- Vitals -->
+      <div>
+        <div class="sec-label">Live Vitals</div>
+        <div class="vitals-grid">
+          <div class="vital-card def" id="cHR">
+            <div class="v-label">Heart Rate</div>
+            <div class="v-val" id="vHR">—</div>
+            <div class="v-unit">bpm</div>
+          </div>
+          <div class="vital-card def" id="cSPO2">
+            <div class="v-label">SpO₂</div>
+            <div class="v-val" id="vSPO2">—</div>
+            <div class="v-unit">%</div>
+          </div>
+          <div class="vital-card def" id="cTEMP">
+            <div class="v-label">Temperature</div>
+            <div class="v-val" id="vTEMP">—</div>
+            <div class="v-unit">°C</div>
+          </div>
+          <div class="vital-card def" id="cFHR">
+            <div class="v-label">Fetal HR</div>
+            <div class="v-val" id="vFHR">—</div>
+            <div class="v-unit">bpm</div>
+          </div>
+          <div class="vital-card def" id="cMOV">
+            <div class="v-label">Fetal Moves</div>
+            <div class="v-val" id="vMOV">—</div>
+            <div class="v-unit">/ hour</div>
+          </div>
+          <div class="vital-card def" id="cACT">
+            <div class="v-label">Activity</div>
+            <div class="v-val" id="vACT" style="font-size:15px;font-weight:700">—</div>
+            <div class="v-unit">&nbsp;</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <div>
+        <div class="sec-label">Active Alerts</div>
+        <div class="alert-list" id="alertList">
+          <div class="no-alerts">
+            <i class="fa-solid fa-circle-check"></i>
+            No active alerts — all looks good
+          </div>
+        </div>
+      </div>
+
+      <!-- Session -->
+      <div>
+        <div class="sec-label">Session Settings</div>
+        <div class="session-fields">
+          <div class="field-row">
+            <label>Mother ID</label>
+            <input type="text" id="motherId" value="maternal_main" />
+          </div>
+          <div class="field-row">
+            <label>Language</label>
+            <select id="langSelect">
+              <option value="en">English</option>
+              <option value="kn">ಕನ್ನಡ</option>
+              <option value="hi">हिंदी</option>
+              <option value="ta">தமிழ்</option>
+              <option value="te">తెలుగు</option>
+              <option value="mr">मराठी</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <button class="btn-clear" onclick="clearChat()">
+        <i class="fa-solid fa-rotate-left"></i> Clear Conversation
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════ CHAT PANEL ═══════════ -->
+  <main class="chat-panel">
+
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="chat-hdr-left">
+        <div class="chat-hdr-avatar">🤱</div>
+        <div>
+          <div class="chat-hdr-title">MaternaAI</div>
+          <div class="chat-hdr-sub" id="hdrSub">Ask anything about your pregnancy</div>
+        </div>
+      </div>
+      <div class="agent-tag" id="agentTag">
+        <i class="fa-solid fa-circle fa-2xs"></i> Ready
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🤱</div>
+        <h2>Hello, I'm MaternaAI</h2>
+        <p>Your caring AI companion through pregnancy. Ask about symptoms, sensor alerts, nutrition, or anything on your mind — in any language.</p>
+        <div class="quick-grid">
+          <button class="quick-btn" onclick="q('How many times should my baby move per hour?')">👶 Baby movements</button>
+          <button class="quick-btn" onclick="q('What is a normal heart rate during pregnancy?')">❤️ Heart rate</button>
+          <button class="quick-btn" onclick="q('What does a chorioamnionitis risk alert mean?')">⚠️ Alert meaning</button>
+          <button class="quick-btn" onclick="q('I feel tired and dizzy — what should I do?')">😔 Feeling unwell</button>
+          <button class="quick-btn" onclick="q('What foods are best during pregnancy in India?')">🥗 Nutrition</button>
+          <button class="quick-btn" onclick="q('When should I go to the hospital immediately?')">🏥 Emergency signs</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea
+          id="msgInput"
+          placeholder="Ask about your pregnancy, symptoms, or sensor readings…"
+          rows="1"
+          maxlength="2000"
+          onkeydown="onKey(event)"
+          oninput="grow(this); cnt(this)"
+        ></textarea>
+        <div class="input-right">
+          <span class="char-count" id="charCnt">0/2000</span>
+          <button class="send-btn" id="sendBtn" onclick="send()" title="Send (Enter)">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+      <div class="input-hint">Press Enter to send · Shift+Enter for new line</div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Critical Alert Overlay -->
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-icon">🚨</div>
+    <div class="overlay-title" id="ovTitle">Critical Alert</div>
+    <div class="overlay-body" id="ovBody">Please go to the hospital immediately.</div>
+    <button class="overlay-btn" onclick="closeOverlay()">I Understand — Taking Action</button>
+  </div>
+</div>
+
+<script>
+  marked.setOptions({ breaks: true, gfm: true });
+
+  let busy = false;
+
+  /* Auto-grow textarea */
+  function grow(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+  function cnt(el) {
+    document.getElementById('charCnt').textContent = el.value.length + '/2000';
+  }
+
+  /* Enter key */
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  /* Quick prompt */
+  function q(text) {
+    document.getElementById('msgInput').value = text;
+    send();
+  }
+
+  /* Send */
+  async function send() {
+    const inp = document.getElementById('msgInput');
+    const text = inp.value.trim();
+    if (!text || busy) return;
+
+    const motherId = document.getElementById('motherId').value.trim() || 'maternal_main';
+    const lang = document.getElementById('langSelect').value;
+
+    // Hide welcome
+    const w = document.getElementById('welcome');
+    if (w) w.remove();
+
+    inp.value = '';
+    inp.style.height = 'auto';
+    document.getElementById('charCnt').textContent = '0/2000';
+
+    addMsg('user', text);
+    busy = true;
+    setLoading(true);
+    showTyping();
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, mother_id: motherId, language: lang })
+      });
+      const data = await res.json();
+      hideTyping();
+
+      if (res.ok && data.status === 'success') {
+        addMsg('ai', data.response, data.agent);
+        setAgent(data.agent);
+      } else {
+        addMsg('ai', `⚠️ ${data.detail || 'Something went wrong. Please try again.'}`, 'ERROR');
+      }
+    } catch {
+      hideTyping();
+      addMsg('ai', '⚠️ Cannot reach the server. Please check that the backend is running.', 'ERROR');
+    } finally {
+      busy = false;
+      setLoading(false);
+    }
+  }
+
+  /* Add message */
+  function addMsg(role, text, agent) {
+    const box = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+
+    const av = role === 'user' ? '👩' : '🤱';
+    const content = role === 'ai' ? marked.parse(text) : esc(text);
+    const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const meta = agent
+      ? `<div class="msg-meta">${fmtAgent(agent)} · ${ts}</div>`
+      : `<div class="msg-meta">${ts}</div>`;
+
+    div.innerHTML = `
+      <div class="msg-av">${av}</div>
+      <div class="msg-body">
+        <div class="bubble">${content}</div>
+        ${meta}
+      </div>`;
+
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function esc(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtAgent(a) {
+    const map = {
+      CONVERSATION_AGENT: '💬 Conversation',
+      RAG_AGENT:          '📚 Clinical Guide',
+      INPUT_GUARDRAILS:   '🛡 Safety Filter',
+      ERROR:              '⚠️ Error'
+    };
+    return map[a] || a;
+  }
+
+  /* Typing indicator */
+  function showTyping() {
+    const box = document.getElementById('messages');
+    const el = document.createElement('div');
+    el.className = 'typing'; el.id = 'typing';
+    el.innerHTML = `<div class="msg-av">🤱</div><div class="typing-dots"><span></span><span></span><span></span></div>`;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+  function hideTyping() {
+    document.getElementById('typing')?.remove();
+  }
+
+  /* Loading */
+  function setLoading(on) {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = on;
+    btn.innerHTML = on
+      ? '<i class="fa-solid fa-spinner fa-spin"></i>'
+      : '<i class="fa-solid fa-paper-plane"></i>';
+  }
+
+  /* Agent badge */
+  function setAgent(a) {
+    const tag = document.getElementById('agentTag');
+    const m = {
+      CONVERSATION_AGENT: { ico: 'fa-comments',     label: 'Conversation',   color: '#7C3AED' },
+      RAG_AGENT:          { ico: 'fa-book-medical', label: 'Clinical RAG',   color: '#059669' },
+    };
+    const x = m[a] || { ico: 'fa-circle', label: a || 'Ready', color: '#9D97B0' };
+    tag.innerHTML = `<i class="fa-solid ${x.ico}"></i> ${x.label}`;
+    tag.style.color = x.color;
+    tag.style.background = x.color + '18';
+  }
+
+  /* Clear chat */
+  function clearChat() {
+    const box = document.getElementById('messages');
+    box.innerHTML = `
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🤱</div>
+        <h2>Hello, I'm MaternaAI</h2>
+        <p>Your caring AI companion through pregnancy. Ask about symptoms, sensor alerts, nutrition, or anything on your mind — in any language.</p>
+        <div class="quick-grid">
+          <button class="quick-btn" onclick="q('How many times should my baby move per hour?')">👶 Baby movements</button>
+          <button class="quick-btn" onclick="q('What is a normal heart rate during pregnancy?')">❤️ Heart rate</button>
+          <button class="quick-btn" onclick="q('What does a chorioamnionitis risk alert mean?')">⚠️ Alert meaning</button>
+          <button class="quick-btn" onclick="q('I feel tired and dizzy — what should I do?')">😔 Feeling unwell</button>
+          <button class="quick-btn" onclick="q('What foods are best during pregnancy in India?')">🥗 Nutrition</button>
+          <button class="quick-btn" onclick="q('When should I go to the hospital immediately?')">🏥 Emergency signs</button>
+        </div>
+      </div>`;
+    setAgent(null);
+  }
+
+  /* Sensor polling */
+  async function pollSensors() {
+    const mid = document.getElementById('motherId').value.trim() || 'maternal_main';
+    try {
+      const r = await fetch(`/sensor-context/${mid}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      updateSensors(d);
+    } catch {}
+  }
+
+  function updateSensors(d) {
+    if (!d || d.status === 'error') return;
+
+    if (d.status === 'no_data') {
+      document.getElementById('statusPill').innerHTML =
+        '<span class="status-dot" style="background:#9D97B0;animation:none"></span> Waiting for sensor';
+      return;
+    }
+
+    document.getElementById('statusPill').innerHTML =
+      '<span class="status-dot"></span> Sensor Live';
+
+    const v = d.vitals;
+    if (v) {
+      setVital('vHR', 'cHR', v.maternal_hr, 78, 100);
+      setVital('vSPO2', 'cSPO2', v.spo2, 96, 100, 1);
+      setVital('vTEMP', 'cTEMP', v.temperature, 36.5, 37.5, 1);
+      setVital('vFHR', 'cFHR', v.fetal_hr, 110, 160);
+      setVital('vMOV', 'cMOV', v.fetal_movement_count_1h, 4, 999);
+      const act = v.activity_level;
+      if (act) document.getElementById('vACT').textContent =
+        act.charAt(0).toUpperCase() + act.slice(1);
+    }
+
+    const flags = d.active_flags || [];
+    const list = document.getElementById('alertList');
+    if (!flags.length) {
+      list.innerHTML = `<div class="no-alerts"><i class="fa-solid fa-circle-check"></i>No active alerts — all looks good</div>`;
+    } else {
+      list.innerHTML = flags.map(f => `
+        <div class="alert-item ${f.severity === 'CRITICAL' ? 'crit' : f.severity === 'INFO' ? 'info' : ''}">
+          <div class="alert-name">${fmtFlag(f.flag_name)}</div>
+          <div class="alert-reason">${f.reasoning || ''}</div>
+        </div>`).join('');
+      const crit = flags.find(f => f.severity === 'CRITICAL');
+      if (crit) showOverlay(crit);
+    }
+  }
+
+  function setVital(vid, cid, val, lo, hi, dec = 0) {
+    const el = document.getElementById(vid);
+    const card = document.getElementById(cid);
+    if (val == null) { el.textContent = '—'; card.className = 'vital-card def'; return; }
+    el.textContent = typeof val === 'number' ? val.toFixed(dec) : val;
+    const bad = val < lo || val > hi;
+    card.className = 'vital-card ' + (bad ? 'warn' : 'ok');
+  }
+
+  function fmtFlag(s) {
+    return (s || '').replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  /* Overlay */
+  function showOverlay(flag) {
+    if (document.getElementById('overlay').classList.contains('show')) return;
+    document.getElementById('ovTitle').textContent = fmtFlag(flag.flag_name);
+    document.getElementById('ovBody').textContent = (flag.reasoning || '') + '\n\nPlease go to the hospital or call 108 immediately.';
+    document.getElementById('overlay').classList.add('show');
+  }
+  function closeOverlay() {
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  /* Init */
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('msgInput').focus();
+    pollSensors();
+    setInterval(pollSensors, 30000);
+    document.getElementById('motherId').addEventListener('change', pollSensors);
+  });
+</script>
+</body>
+</html>
