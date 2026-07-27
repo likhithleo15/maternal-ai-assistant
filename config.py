@@ -14,7 +14,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 class AgentDecisionConfig:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.1,
             google_api_key=GOOGLE_API_KEY,
         )
@@ -22,7 +22,7 @@ class AgentDecisionConfig:
 class ConversationConfig:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.7,
             google_api_key=GOOGLE_API_KEY,
         )
@@ -50,22 +50,22 @@ class RAGConfig:
 
         # Gemini Flash for RAG processing
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.3,
             google_api_key=GOOGLE_API_KEY
         )
         self.summarizer_model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.5,
             google_api_key=GOOGLE_API_KEY
         )
         self.chunker_model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.0,
             google_api_key=GOOGLE_API_KEY
         )
         self.response_generator_model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             temperature=0.3,
             google_api_key=GOOGLE_API_KEY
         )
@@ -82,7 +82,7 @@ class RAGConfig:
 
 class APIConfig:
     def __init__(self):
-        self.host = os.getenv("API_HOST", "0.0.0.0")
+        self.host = os.getenv("API_HOST", "127.0.0.1")
         self.port = int(os.getenv("API_PORT", 8000))
         self.debug = True
         self.rate_limit = 10

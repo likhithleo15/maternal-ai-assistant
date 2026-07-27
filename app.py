@@ -5,6 +5,8 @@ Stripped to: /chat, /health, /sensor-context
 
 import os
 import uuid
+import re
+import ast
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -54,6 +56,43 @@ def health():
     return {"status": "healthy", "service": "Maternal AI Assistant"}
 
 
+def extract_text_from_content(content) -> str:
+    """Extract clean string text regardless of nested dicts, lists, or stringified structures."""
+    if not content:
+        return ""
+
+    # If content is a list of blocks/dicts
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and "text" in block:
+                text_parts.append(block["text"])
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return "".join(text_parts)
+
+    # Convert to string for inspection
+    text_str = str(content)
+
+    # Check if stringified list like "[{'type': 'text', 'text': '...'}]"
+    if text_str.startswith("[{") or "'text':" in text_str or '"text":' in text_str:
+        try:
+            parsed = ast.literal_eval(text_str)
+            if isinstance(parsed, list):
+                return "".join(
+                    item.get("text", "") for item in parsed if isinstance(item, dict)
+                )
+        except Exception:
+            pass
+
+        # Regex fallback to extract text value directly inside quotes
+        match = re.search(r"['\"]text['\"]\s*:\s*['\"](.*?)['\"](?:\s*\}|\s*,)", text_str, re.DOTALL)
+        if match:
+            return match.group(1).replace("\\n", "\n").replace("\\'", "'")
+
+    return text_str
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     """Main chat endpoint — routes to CONVERSATION or RAG agent."""
@@ -76,7 +115,7 @@ def chat(request: ChatRequest):
         for msg in reversed(messages):
             from langchain_core.messages import AIMessage
             if isinstance(msg, AIMessage) and msg.content:
-                response_text = msg.content
+                response_text = extract_text_from_content(msg.content)
                 break
 
         if not response_text:
